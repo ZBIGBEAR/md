@@ -99,30 +99,6 @@ open index.html
 2. 搜索并添加仓库 `ZBIGBEAR/md`
 3. 即可查看 Stars 增长曲线图
 
-### 配置 Stars 曲线图
-
-如果你想在仓库中使用 Stars Notifier 自动生成曲线图，可以添加以下 GitHub Actions：
-
-```yaml
-# 在仓库 `.github/workflows/notify-stars.yml`
-name: Notify Stars
-on:
-  schedule:
-    - cron: '0 0 * * *'  # 每天凌晨 0 点
-  workflow_dispatch:
-  push:
-    branches: [main]
-jobs:
-  notify:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: orastron/stars-notifier-action@v3.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          org: yourusername
-          repo: markdown-editor
-          webhook_url: ${{ secrets.STARS_WEBHOOK_URL }}
-```
 
 ## 📧 联系方式
 
@@ -134,3 +110,9 @@ jobs:
 ---
 
 Made with ❤️ using pure HTML, CSS, and JavaScript
+
+---
+
+## 📈 Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=ZBIGBEAR/md&type=Date)](https://star-history.com/#ZBIGBEAR/md&Date)
