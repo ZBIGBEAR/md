@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown 在线编辑器</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .toolbar {
+            background: #2d2d2d;
+            color: #fff;
+            padding: 8px 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 100;
+            transition: height 0.3s ease;
+        }
+        .toolbar.hidden { height: 0; padding: 0; overflow: hidden; }
+        .toolbar h1 {
+            font-size: 18px;
+            margin-right: 20px;
+            font-weight: 500;
+        }
+        .toolbar-buttons {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .toolbar-btn {
+            background: #3d3d3d;
+            border: 1px solid #4d4d4d;
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            min-width: auto;
+            white-space: nowrap;
+        }
+        .toolbar-btn:hover { background: #4d4d4d; }
+        .toolbar-divider { width: 1px; height: 24px; background: #4d4d4d; margin: 0 10px; }
+        .syntax-link {
+            color: #aaa;
+            text-decoration: none;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .syntax-link:hover { color: #fff; text-decoration: underline; }
+        .main-content { display: flex; height: calc(100vh - 50px); }
+        .editor-container {
+            flex: 1;
+            display: flex;
+            height: 100%;
+        }
+        .splitter {
+            width: 6px;
+            background: #e8e8e8;
+            cursor: col-resize;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .splitter:hover { background: #d0d0d0; }
+        .editor {
+            flex: 1;
+            padding: 20px;
+            background: #fafafa;
+            color: #333;
+            font-size: 15px;
+            line-height: 1.6;
+            border: none;
+            resize: none;
+            outline: none;
+            font-family: 'Consolas', 'Monaco', monospace;
+            overflow-y: auto;
+        }
+        .preview { width: 0; overflow-y: auto; transition: width 0.3s ease; }
+        .preview.show { width: 50%; }
+        .preview { line-height: 1.8; color: #333; }
+        .preview h1 { font-size: 2em; margin: 0.67em 0 0.5em; border-bottom: 2px solid #eee; padding-bottom: 0.3em; }
+        .preview h2 { font-size: 1.5em; margin: 0.75em 0 0.5em; border-bottom: 1px solid #eee; padding-bottom: 0.2em; }
+        .preview h3 { font-size: 1.25em; margin: 0.83em 0 0.5em; }
+        .preview h4 { font-size: 1em; margin: 1em 0 0.5em; }
+        .preview p { margin: 1em 0; }
+        .preview code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.9em; }
+        .preview pre { background: #282c34; color: #abb2bf; padding: 15px; border-radius: 8px; overflow-x: auto; margin: 1em 0; }
+        .preview pre code { background: transparent; padding: 0; font-size: 14px; }
+        .preview blockquote { border-left: 4px solid #007bff; margin: 1em 0; padding-left: 1em; color: #666; background: #f8f9fa; border-radius: 0 4px 4px 0; }
+        .preview ul, .preview ol { margin: 1em 0; padding-left: 2em; }
+        .preview li { margin: 0.4em 0; }
+        .preview a { color: #007bff; text-decoration: none; }
+        .preview a:hover { text-decoration: underline; }
+        .preview img { max-width: 100%; height: auto; }
+        .preview table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+        .preview th, .preview td { border: 1px solid #ddd; padding: 8px 12px; }
+        .preview th { background: #f5f5f5; }
+        .preview hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
+        .preview .mermaid { background: #fafafa; padding: 20px; border-radius: 8px; display: flex; justify-content: center; align-items: center; }
+        .preview .mermaid svg { max-width: 100%; max-height: 600px; }
+        .shortcut-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .shortcut-modal.show { display: flex; }
+        .shortcut-content {
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        .shortcut-content h2 {
+            margin-bottom: 20px;
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .shortcut-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .shortcut-item { display: flex; align-items: center; gap: 10px; }
+        .shortcut-key {
+            background: #f0f0f0;
+            border: 1px solid #d0d0d0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            min-width: 80px;
+            text-align: center;
+        }
+        .shortcut-desc { color: #666; font-size: 14px; }
+        .shortcut-close {
+            margin-top: 20px;
+            padding: 10px 30px;
+            background: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .shortcut-close:hover { background: #0069d9; }
+
+        /* 悬浮菜单按钮 */
+        .fab {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 56px;
+            height: 56px;
+            background: #2d2d2d;
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        .fab:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+        }
+        .fab.show { transform: rotate(45deg); }
+
+        /* 悬浮菜单 */
+        .fab-menu {
+            position: fixed;
+            bottom: 95px;
+            right: 30px;
+            background: #2d2d2d;
+            border-radius: 12px;
+            padding: 10px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            z-index: 998;
+            display: none;
+            flex-direction: column;
+            gap: 5px;
+            min-width: 160px;
+        }
+        .fab-menu.show { display: flex; }
+        .fab-menu.exported { flex-direction: column; gap: 5px; }
+        .export-submenu-btn { width: 100%; }
+        .fab-menu-btn {
+            background: transparent;
+            border: none;
+            color: #fff;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background 0.2s;
+        }
+        .fab-menu-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        .fab-menu-btn.active {
+            background: rgba(0, 123, 255, 0.3);
+        }
+        @media (max-width: 768px) {
+            .toolbar { padding: 6px 10px; }
+            .toolbar h1 { font-size: 14px; margin-right: 10px; white-space: nowrap; }
+            .toolbar-buttons { gap: 2px; }
+            .toolbar-btn { padding: 4px 8px; font-size: 11px; }
+            .editor, .preview { font-size: 14px; padding: 10px; }
+            .preview.show { width: 100%; }
+            .syntax-link span { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar" id="toolbar">
+        <h1>📝 Markdown 编辑器</h1>
+        <div class="toolbar-buttons">
+            <button class="toolbar-btn primary" onclick="insertBold()">**加粗**</button>
+            <button class="toolbar-btn" onclick="insertItalic()">*斜体*</button>
+            <button class="toolbar-btn" onclick="insertHeading()"><h1>H1</h1></button>
+            <button class="toolbar-btn" onclick="insertHeading('##')"><h2>H2</h2></button>
+            <button class="toolbar-btn" onclick="insertHeading('###')"><h3>H3</h3></button>
+            <button class="toolbar-btn" onclick="insertQuote()">» 引用</button>
+            <button class="toolbar-btn" onclick="insertCodeBlock()">` 代码  </button>
+            <button class="toolbar-btn" onclick="insertCodeBlock('```javascript')">JS 代码块</button>
+            <button class="toolbar-btn" onclick="insertCodeBlock('```python')">Py 代码块</button>
+            <button class="toolbar-btn" onclick="insertCodeBlock('```html')">HTML 代码块</button>
+            <button class="toolbar-btn" onclick="insertUnorderedList()">• 列表</button>
+            <button class="toolbar-btn" onclick="insertOrderedList()">1. 编号列表</button>
+            <button class="toolbar-btn" onclick="insertLink()">🔗 链接</button>
+            <button class="toolbar-btn" onclick="insertImage()">🖼️ 图片</button>
+            <button class="toolbar-btn" onclick="insertHorizontalRule()">— 分隔线</button>
+            <button class="toolbar-btn" onclick="insertMermaid('flowchart')">🔀 流程图</button>
+            <button class="toolbar-btn" onclick="insertMermaid('sequence')">↔️ 序列图</button>
+            <button class="toolbar-btn" onclick="insertMermaid('class')">📦 类图</button>
+            <button class="toolbar-btn" onclick="insertMermaid('state')">▶️ 状态图</button>
+        </div>
+        <div class="toolbar-divider"></div>
+        <div class="toolbar-buttons">
+            <button class="toolbar-btn" id="togglePreview" onclick="togglePreview()" title="显示/隐藏预览">👁️ 预览</button>
+            <select id="splitRatio" onchange="changeSplitRatio()" title="调整分割比例">
+                <option value="33">33%</option>
+                <option value="50" selected>50%</option>
+                <option value="66">66%</option>
+            </select>
+            <button class="toolbar-btn" onclick="clearEditor()" title="清空编辑器">🗑️ 清空</button>
+        </div>
+        <a href="#" class="syntax-link" onclick="showShortcuts(event)">
+            ⌨️ 快捷键 <span>→</span>
+        </a>
+    </div>
+    <div class="main-content">
+        <div class="editor-container" id="editorContainer">
+            <textarea class="editor" id="markdownInput" placeholder="在此开始编写 Markdown..." oninput="updatePreview()"></textarea>
+            <div class="splitter" id="splitter" onmousedown="startResize(event)"></div>
+            <div class="preview" id="preview"></div>
+        </div>
+    </div>
+    <div class="shortcut-modal" id="shortcutModal">
+        <div class="shortcut-content">
+            <h2>⌨️ 快捷键列表</h2>
+            <div class="shortcut-grid">
+                <div class="shortcut-item"><span class="shortcut-key">Ctrl/Cmd</span> <span class="shortcut-desc">+ B</span> <span class="shortcut-desc">加粗</span></div>
+                <div class="shortcut-item"><span class="shortcut-key">Ctrl/Cmd</span> <span class="shortcut-desc">+ I</span> <span class="shortcut-desc">斜体</span></div>
+                <div class="shortcut-item"><span class="shortcut-key">Ctrl/Cmd</span> <span class="shortcut-desc">+ K</span> <span class="shortcut-desc">链接</span></div>
+                <div class="shortcut-item"><span class="shortcut-key">Ctrl/Cmd</span> <span class="shortcut-desc">+ E</span> <span class="shortcut-desc">代码</span></div>
+                <div class="shortcut-item"><span class="shortcut-key">Ctrl/Cmd</span> <span class="shortcut-desc">+ L</span> <span class="shortcut-desc">列表</span></div>
+                <div class="shortcut-item"><span class="shortcut-key">Ctrl/Cmd</span> <span class="shortcut-desc">+ M</span> <span class="shortcut-desc">流程图</span></div>
+            </div>
+            <button class="shortcut-close" onclick="closeShortcuts()">关闭</button>
+        </div>
+    </div>
+    <button class="fab" id="fab" onclick="toggleFabMenu()" title="功能菜单">+</button>
+    <div class="fab-menu" id="fabMenu">
+        <button class="fab-menu-btn active" id="menuToggleToolbar" onclick="toggleToolbar()">
+            ⚙️ 隐藏工具栏
+        </button>
+        <button class="fab-menu-btn" onclick="window.open('https://mermaid.js.org/syntax/flowchart.html', '_blank'); toggleFabMenu();">
+            📊 Mermaid 画图语法
+        </button>
+        <button class="fab-menu-btn" onclick="window.open('https://markdown.com.cn/basic-syntax/', '_blank'); toggleFabMenu();">
+            📖 Markdown 语法参考
+        </button>
+        <button class="fab-menu-btn" id="fabPreviewBtn" onclick="togglePreview(); updateFabPreviewBtnText(); toggleFabMenu();">
+            👁️ 预览
+        </button>
+        <button class="fab-menu-btn" onclick="exportMD(); toggleFabMenu();">
+            📄 导出 MD
+        </button>
+        <button class="fab-menu-btn" onclick="exportPDF(); toggleFabMenu();">
+            📑 导出 PDF
+        </button>
+        <button class="fab-menu-btn" onclick="clearEditor(); toggleFabMenu();">
+            🗑️ 清空编辑器
+        </button>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/svg2pdf@0.5.1/dist/svg2pdf.umd.min.js"></script>
+    <script>
+        console.log('=== Markdown 编辑器启动 ===');
+
+        const editor = document.getElementById('markdownInput');
+        const preview = document.getElementById('preview');
+        const editorContainer = document.getElementById('editorContainer');
+        const splitter = document.getElementById('splitter');
+        const toolbar = document.getElementById('toolbar');
+        const fab = document.getElementById('fab');
+        const fabMenu = document.getElementById('fabMenu');
+        const menuToggleToolbar = document.getElementById('menuToggleToolbar');
+        let isResizing = false;
+
+        console.log('DOM 元素获取完成');
+
+        let mermaidInitialized = false;
+        async function initMermaid() {
+            if (mermaidInitialized) return;
+            console.log('初始化 Mermaid...');
+
+            try {
+                if (typeof mermaid === 'undefined') {
+                    throw new Error('Mermaid 库未加载');
+                }
+                await mermaid.initialize({ startOnLoad: false, theme: 'default' });
+                mermaidInitialized = true;
+                console.log('Mermaid 初始化完成');
+            } catch (e) {
+                console.error('Mermaid 初始化失败:', e);
+            }
+        }
+
+        async function updatePreview() {
+            console.log('开始更新预览...');
+            await initMermaid();
+
+            const markdown = editor.value;
+            console.log('编辑器内容:', markdown.substring(0, 200));
+
+            const parsed = marked.parse(markdown);
+            const parsedWithMermaid = parsed.replace(/<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g, '<div class="mermaid">$1</div>');
+            console.log('处理后的内容:', parsedWithMermaid.substring(0, 200));
+
+            preview.innerHTML = parsedWithMermaid;
+
+            const mermaidElements = preview.querySelectorAll('.mermaid');
+            console.log('找到', mermaidElements.length, '个 Mermaid 元素');
+
+            if (mermaidElements.length > 0) {
+                const elements = Array.from(mermaidElements).map((el, i) => {
+                    el.id = 'mermaid-' + i;
+                    return el;
+                });
+
+                setTimeout(async () => {
+                    try {
+                        await mermaid.run({ nodes: elements });
+                        console.log('Mermaid 渲染成功');
+                    } catch (e) {
+                        console.error('Mermaid 渲染错误:', e);
+                        elements.forEach(el => {
+                            el.innerHTML = `<span style="color:red">❌ 渲染错误</span>`;
+                        });
+                    }
+                }, 50);
+            }
+        }
+
+        function insertTextAtCursor(text, preserveCursor = true) {
+            const startPos = editor.selectionStart;
+            const endPos = editor.selectionEnd;
+            const textBefore = editor.value.substring(0, startPos);
+            const textAfter = editor.value.substring(endPos);
+            const selectedText = editor.value.substring(startPos, endPos);
+
+            editor.value = textBefore + text + selectedText + textAfter;
+
+            if (preserveCursor && selectedText) {
+                editor.focus();
+                editor.setSelectionRange(startPos + text.length, startPos + text.length);
+            } else {
+                editor.focus();
+            }
+            updatePreview();
+        }
+
+        function insertBold() { insertTextAtCursor('**', '**'); }
+        function insertItalic() { insertTextAtCursor('*', '*'); }
+        function insertHeading(level = '##') { insertTextAtCursor(`\n${level} 标题\n\n`, false); }
+        function insertQuote() { insertTextAtCursor('\n> 引用文本\n\n', false); }
+        function insertCodeBlock(lang = '```') { insertTextAtCursor(`\n${lang}\n代码\n\`\`\`\n\n`, false); }
+        function insertUnorderedList() { insertTextAtCursor('\n- 项目 1\n- 项目 2\n\n', false); }
+        function insertOrderedList() { insertTextAtCursor('\n1. 第一个\n2. 第二个\n\n', false); }
+        function insertLink() {
+            const url = prompt('链接地址:', 'https://');
+            const text = prompt('显示文本:', '链接');
+            if (url && text) insertTextAtCursor(`[${text}](${url})`, false);
+        }
+        function insertImage() {
+            const url = prompt('图片地址:', 'https://');
+            const alt = prompt('替代文本:', '图片');
+            if (url && alt) insertTextAtCursor(`![${alt}](${url})`, false);
+        }
+        function insertHorizontalRule() { insertTextAtCursor('\n---\n\n', false); }
+        function insertMermaid(type = 'flowchart') {
+            const templates = {
+                flowchart: `graph TD\n    A[开始] --> B[处理]\n    B --> C{判断}\n    C -- 是 --> D[成功]\n    C -- 否 --> E[失败]\n    D --> F[结束]\n    E --> B`,
+                sequence: `sequenceDiagram\n    A->>B: 请求\n    B->>C: 处理\n    C-->>B: 响应\n    B-->>A: 返回`,
+                class: `classDiagram\nclass User {\n    +String name\n    +login()\n}\nclass System {\n    +process()\n}`,
+                state: `stateDiagram-v2\n    [*] --> 开始\n    开始 --> 结束`
+            };
+            insertTextAtCursor(`\n\`\`\`mermaid\n${templates[type]}\n\`\`\`\n\n`, false);
+        }
+
+        function toggleToolbar() {
+            toolbar.classList.toggle('hidden');
+            const isHidden = toolbar.classList.contains('hidden');
+            menuToggleToolbar.textContent = isHidden ? '⚙️ 显示工具栏' : '⚙️ 隐藏工具栏';
+            menuToggleToolbar.classList.toggle('active', !isHidden);
+        }
+
+        // 初始化菜单状态
+        menuToggleToolbar.textContent = '⚙️ 隐藏工具栏';
+        menuToggleToolbar.classList.add('active');
+
+        function toggleFabMenu() {
+            console.log('toggleFabMenu called');
+            fab.classList.toggle('show');
+            fabMenu.classList.toggle('show');
+            fabMenu.classList.remove('exported');
+            console.log('fabMenu.classList:', fabMenu.classList.toString());
+        }
+
+        function generateFileName(ext) {
+            const now = new Date();
+            const timestamp = now.getTime();
+            const random = Math.floor(Math.random() * 1000);
+            const dateStr = now.toISOString().slice(0, 10);
+            return `markdown_${dateStr}_${timestamp}_${random}.${ext}`;
+        }
+
+        function exportMD() {
+            const content = editor.value;
+            const filename = generateFileName('md');
+            const blob = new Blob([content], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        async function exportPDF() {
+            if (!window.jspdf || !window.html2canvas) {
+                alert('PDF导出库加载中，请稍后再试');
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+
+            // 显示 loading 提示
+            showLoading('正在导出 PDF...');
+
+            // 隐藏分割线，只显示预览内容
+            preview.style.width = '100%';
+            preview.style.borderLeft = 'none';
+            preview.style.paddingLeft = '0';
+
+            // 等待所有 Mermaid 图表渲染完成
+            const mermaidElements = preview.querySelectorAll('.mermaid');
+            console.log('Mermaid elements count:', mermaidElements.length);
+
+            if (mermaidElements.length > 0) {
+                try {
+                    if (window.mermaid) {
+                        console.log('Mermaid render started');
+                        await mermaid.run({
+                            nodes: Array.from(mermaidElements)
+                        });
+                        console.log('Mermaid render completed');
+                        // 等待 SVG 渲染完成
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                } catch (e) {
+                    console.log('Mermaid 渲染:', e);
+                }
+            }
+
+            // 等待 html2canvas 渲染
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            try {
+                // 创建一个克隆的预览容器用于导出（不影响原预览）
+                const exportContainer = document.createElement('div');
+                exportContainer.style.cssText = `
+                    position: absolute;
+                    left: -9999px;
+                    top: 0;
+                    width: 100%;
+                    overflow: hidden;
+                    background: white;
+                `;
+                exportContainer.innerHTML = preview.innerHTML;
+
+                // 隐藏分割线样式
+                exportContainer.style.borderLeft = 'none';
+                exportContainer.style.paddingLeft = '0';
+
+                // 确保 Mermaid 图表居中
+                const mermaidElements = exportContainer.querySelectorAll('.mermaid');
+                mermaidElements.forEach(el => {
+                    el.style.display = 'flex';
+                    el.style.justifyContent = 'center';
+                    el.style.alignItems = 'center';
+                    el.style.margin = '20px 0';
+                });
+
+                document.body.appendChild(exportContainer);
+
+                // 使用 html2canvas 捕获导出容器
+                const canvas = await html2canvas(exportContainer, {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    logging: false,
+                    foreignObjectRendering: false,
+                    backgroundColor: '#ffffff'
+                });
+
+                const canvasWidth = canvas.width;
+                const canvasHeight = canvas.height;
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pageHeight = 297; // A4 height in mm
+                const pdfWidth = 210; // A4 width in mm
+
+                console.log('Canvas size:', canvasWidth, 'x', canvasHeight);
+
+                // 计算缩放比例
+                const scale = pdfWidth / canvasWidth;
+                const scaledHeight = canvasHeight * scale;
+
+                // 计算页数
+                const pages = Math.ceil(scaledHeight / pageHeight);
+
+                const margin = 20; // 左右边距（mm）
+                const topMargin = 10; // 顶部边距（mm）
+
+                for (let i = 0; i < pages; i++) {
+                    if (i > 0) {
+                        pdf.addPage();
+                    }
+
+                    const y = -i * pageHeight + topMargin;
+                    const height = Math.min(pageHeight - topMargin - margin, scaledHeight - i * pageHeight);
+
+                    pdf.addImage(canvas.toDataURL(), 'PNG', margin, y, pdfWidth - margin * 2, height);
+                }
+
+                document.body.removeChild(exportContainer);
+
+                const filename = generateFileName('pdf');
+                pdf.save(filename);
+
+                // 隐藏 loading 提示
+                hideLoading();
+            } catch (error) {
+                console.error('PDF导出失败:', error);
+                hideLoading();
+                alert('PDF导出失败: ' + error.message);
+            }
+
+            // 恢复原来的宽度
+            setTimeout(() => {
+                const currentWidth = editor.style.width || '50%';
+                preview.style.width = currentWidth;
+                preview.style.borderLeft = '';
+                preview.style.paddingLeft = '';
+            }, 100);
+        }
+
+        function togglePreview() {
+            if (preview.classList.contains('show')) {
+                preview.classList.remove('show');
+                preview.style.width = '';
+            } else {
+                preview.classList.add('show');
+                preview.style.width = '';
+            }
+            updateFabPreviewBtnText();
+            updatePreviewBtnText();
+        }
+
+        function updatePreviewBtnText() {
+            const btn = document.getElementById('togglePreview');
+            if (btn) {
+                btn.textContent = preview.classList.contains('show') ? '👁️ 隐藏' : '👁️ 预览';
+            }
+        }
+
+        function updateFabPreviewBtnText() {
+            const btn = document.getElementById('fabPreviewBtn');
+            if (btn) {
+                btn.textContent = preview.classList.contains('show') ? '👁️ 隐藏' : '👁️ 预览';
+            }
+        }
+
+        function changeSplitRatio() {
+            const ratio = document.getElementById('splitRatio').value;
+            editor.style.width = ratio + '%';
+            preview.style.width = (100 - ratio) + '%';
+            preview.classList.add('show');
+        }
+
+        let loadingElement = null;
+        function showLoading(message) {
+            if (loadingElement) return;
+            loadingElement = document.createElement('div');
+            loadingElement.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 20px 40px;
+                border-radius: 8px;
+                z-index: 10000;
+                font-size: 16px;
+            `;
+            loadingElement.textContent = message;
+            document.body.appendChild(loadingElement);
+        }
+
+        function hideLoading() {
+            if (loadingElement) {
+                loadingElement.remove();
+                loadingElement = null;
+            }
+        }
+
+        function clearEditor() {
+            if (confirm('确定清空吗？')) {
+                editor.value = '';
+                updatePreview();
+                updatePreviewBtnText();
+                updateFabPreviewBtnText();
+            }
+        }
+
+        function showShortcuts(e) {
+            e.preventDefault();
+            document.getElementById('shortcutModal').classList.add('show');
+        }
+
+        function closeShortcuts() {
+            document.getElementById('shortcutModal').classList.remove('show');
+        }
+
+        editor.addEventListener('keydown', function(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                insertTextAtCursor('    ', true);
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                e.preventDefault();
+                insertBold();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+                e.preventDefault();
+                insertItalic();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'm') {
+                e.preventDefault();
+                insertMermaid('flowchart');
+            }
+            if (e.key === '/' && document.activeElement === editor) {
+                e.preventDefault();
+                editor.setSelectionRange(0, 0);
+                editor.focus();
+            }
+        });
+
+        function startResize(e) {
+            isResizing = true;
+            document.addEventListener('mousemove', resize);
+            document.addEventListener('mouseup', stopResize);
+            e.preventDefault();
+        }
+
+        function resize(e) {
+            if (!isResizing) return;
+            const percentage = (e.clientX / editorContainer.getBoundingClientRect().width) * 100;
+            if (percentage > 10 && percentage < 90) {
+                editor.style.width = percentage + '%';
+                preview.style.width = (100 - percentage) + '%';
+                console.log('调整宽度:', percentage + '%', '预览显示:', preview.classList.contains('show'));
+                // 只调整宽度，不强制显示预览
+            }
+        }
+
+        function stopResize() {
+            isResizing = false;
+            document.removeEventListener('mousemove', resize);
+            document.removeEventListener('mouseup', stopResize);
+        }
+
+        document.getElementById('shortcutModal').addEventListener('click', function(e) {
+            if (e.target === this) closeShortcuts();
+        });
+
+        fabMenu.addEventListener('click', function(e) {
+            if (e.target === fabMenu) toggleFabMenu();
+        });
+
+        splitter.addEventListener('dblclick', function() {
+            editor.style.width = '50%';
+            preview.style.width = '50%';
+        });
+
+        editor.value = `# 欢迎使用 Markdown 编辑器
+
+## 快速开始
+
+点击工具栏按钮或使用快捷键快速编写 Markdown。
+
+### 文本格式
+
+**粗体** - 点击工具栏的 **加粗** 按钮或按 Ctrl/Cmd + B
+*斜体* - 点击工具栏的 *斜体* 按钮或按 Ctrl/Cmd + I
+~~删除线~~ - 自定义 Markdown
+
+### 标题
+
+H1 - 点击工具栏的 H1 按钮
+## H2 - 点击工具栏的 H2 按钮
+### H3 - 点击工具栏的 H3 按钮
+
+### 引用
+
+» 引用文本 - 点击工具栏的引用按钮
+
+### 代码
+
+\`行内代码\` - 点击代码按钮插入
+\`\`\`
+代码块
+多行代码
+\`\`\`
+
+### 列表
+
+- 项目 1 - 点击列表按钮
+  - 嵌套项目
+- 项目 2
+1. 编号列表 - 点击编号列表按钮
+2. 第二项
+
+### 链接和图片
+
+[链接文本](https://example.com) - 点击链接按钮
+![图片说明](https://example.com/image.jpg) - 点击图片按钮
+
+### 分隔线
+
+---
+
+### Mermaid 图表
+
+🔀 流程图 - 点击流程图按钮
+\`\`\`mermaid
+graph TD
+    A[开始] --> B[处理]
+    B --> C{判断}
+    C -- 是 --> D[成功]
+    C -- 否 --> E[失败]
+    D --> F[结束]
+    E --> B
+\`\`\`
+
+↔️ 序列图 - 点击序列图按钮
+\`\`\`mermaid
+sequenceDiagram
+    A->>B: 请求
+    B->>C: 处理
+    C-->>B: 响应
+    B-->>A: 返回
+\`\`\`
+
+📦 类图 - 点击类图按钮
+\`\`\`mermaid
+classDiagram
+    class User {
+        +String name
+        +login()
+    }
+    class System {
+        +process()
+    }
+    User --> System
+\`\`\`
+
+▶️ 状态图 - 点击状态图按钮
+\`\`\`mermaid
+stateDiagram-v2
+    [*] --> 开始
+    开始 --> 结束
+    开始 --> 中间
+    中间 --> 结束
+\`\`\`
+`;
+        updatePreview();
+    </script>
+</body>
+</html>
