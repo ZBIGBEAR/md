@@ -3,8 +3,8 @@
 一个轻量级、功能强大的 Markdown 在线编辑器，支持实时预览、Mermaid 图表和导出功能。
 
 ![GitHub License](https://img.shields.io/badge/license-MIT-green.svg)
-![GitHub Stars](https://img.shields.io/github/stars/yourusername/markdown-editor.svg)
-![GitHub Forks](https://img.shields.io/github/forks/yourusername/markdown-editor.svg)
+![GitHub Stars](https://img.shields.io/github/stars/ZBIGBEAR/md.svg)
+![GitHub Forks](https://img.shields.io/github/forks/ZBIGBEAR/md.svg)
 
 ## ✨ 功能特性
 
@@ -87,12 +87,49 @@ open index.html
 
 欢迎提交 Issue 和 Pull Request！
 
+## 📊 Stars 趋势
+
+[![Stars Notifier](https://img.shields.io/badge/Stars%20Chart-View%20Stars%20Chart-blue)](https://stars-notifier.netlify.app/dashboard#?repo=ZBIGBEAR/md)
+
+点击上方按钮查看 GitHub Stars 的增长趋势图。
+
+### 如何查看
+
+1. 访问 [Stars Notifier](https://stars-notifier.netlify.app/)
+2. 搜索并添加仓库 `ZBIGBEAR/md`
+3. 即可查看 Stars 增长曲线图
+
+### 配置 Stars 曲线图
+
+如果你想在仓库中使用 Stars Notifier 自动生成曲线图，可以添加以下 GitHub Actions：
+
+```yaml
+# 在仓库 `.github/workflows/notify-stars.yml`
+name: Notify Stars
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 每天凌晨 0 点
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: orastron/stars-notifier-action@v3.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          org: yourusername
+          repo: markdown-editor
+          webhook_url: ${{ secrets.STARS_WEBHOOK_URL }}
+```
+
 ## 📧 联系方式
 
 如有问题或建议，欢迎通过以下方式联系：
 
 - 提交 GitHub Issue
-- 发送邮件至 your.email@example.com
+- 发送邮件至 664141154@qq.com
 
 ---
 
