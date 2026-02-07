@@ -33,7 +33,9 @@ open index.html
 
 ### 在线预览
 
-打开 `index.html` 文件，开始编写 Markdown 吧！
+访问 [https://zbigbear.github.io/md](https://zbigbear.github.io/md) 在线体验。
+
+或打开 `index.html` 文件，开始编写 Markdown 吧！
 
 ## 🎯 使用指南
 
